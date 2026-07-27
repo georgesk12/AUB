@@ -22,9 +22,10 @@
     [hidden] { display: none !important; }
     body {
       margin: 0;
+      min-height: 100vh;
       font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       color: var(--ink);
-      background: #fbfaf8;
+      background: linear-gradient(180deg, #fdfcfa 0%, #f3ede6 100%);
     }
     header {
       padding: 20px 28px;
@@ -119,7 +120,9 @@
       padding: 10px 12px;
       box-shadow: 0 1px 2px rgba(0,0,0,0.04);
       cursor: grab;
+      transition: box-shadow 0.15s ease, transform 0.15s ease;
     }
+    .card:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.10); transform: translateY(-1px); }
     .card:active { cursor: grabbing; }
     .card.dragging { opacity: 0.5; }
     .card-top {
@@ -163,11 +166,14 @@
     /* ---- Header layout + buttons ----------------------------------- */
     header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
     .btn-primary {
-      background: var(--accent); color: #3a2f14; border: none;
+      background: linear-gradient(180deg, #ffb84a 0%, #ffab31 100%);
+      color: #3a2f14; border: none;
       font-weight: 700; font-size: 14px; border-radius: 8px;
       padding: 9px 16px; cursor: pointer; white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(224,150,20,0.30);
     }
-    .btn-primary:hover { filter: brightness(0.96); }
+    .btn-primary:hover { filter: brightness(0.97); }
+    .btn-primary:active { transform: translateY(1px); }
     .btn-secondary {
       background: #fff; color: var(--muted); border: 1px solid var(--line);
       font-size: 14px; border-radius: 8px; padding: 9px 16px; cursor: pointer;
