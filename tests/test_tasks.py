@@ -145,3 +145,44 @@ def test_delete_existing_returns_204_no_body(client, created_task):
 def test_delete_missing_returns_404(client):
     r = client.delete("/tasks/does-not-exist")
     assert r.status_code == 404
+
+
+# --------------------------------------------------------------------------
+# Expanded PATCH edge cases (Module 3.5). The frontend leans on PATCH for
+# every drag move and every status edit, so these guard the rules that keep
+# the board from accepting bad moves.
+# --------------------------------------------------------------------------
+
+
+def test_patch_backward_transition_inprogress_to_todo_returns_422(client, created_task):
+    """A backward move (InProgress -> ToDo) must be rejected."""
+    tid = created_task["id"]
+    assert client.patch(f"/tasks/{tid}", json={"status": "InProgress"}).status_code == 200
+    r = client.patch(f"/tasks/{tid}", json={"status": "ToDo"})
+    assert r.status_code == 422
+
+
+def test_patch_reopen_done_to_inprogress_returns_200(client, created_task):
+    """Reopening a finished task (Done -> InProgress) is allowed."""
+    tid = created_task["id"]
+    client.patch(f"/tasks/{tid}", json={"status": "InProgress"})
+    client.patch(f"/tasks/{tid}", json={"status": "Done"})
+    r = client.patch(f"/tasks/{tid}", json={"status": "InProgress"})
+    assert r.status_code == 200
+    assert r.json()["status"] == "InProgress"
+
+
+def test_patch_unsupported_status_value_returns_422(client, created_task):
+    """An unknown status string (e.g. 'Archived') is rejected by the enum."""
+    r = client.patch(f"/tasks/{created_task['id']}", json={"status": "Archived"})
+    assert r.status_code == 422
+
+
+def test_patch_priority_only_keeps_status_and_returns_200(client, created_task):
+    """A priority-only edit must NOT trigger transition validation."""
+    tid = created_task["id"]
+    r = client.patch(f"/tasks/{tid}", json={"priority": "High"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["priority"] == "High"
+    assert body["status"] == "ToDo"   # status left untouched
