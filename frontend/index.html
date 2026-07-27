@@ -365,6 +365,12 @@
       return `${d.getFullYear()}-${m}-${day}`;
     }
 
+    // A task is overdue if its due date is before today and it is not Done -
+    // the same rule the backend uses.
+    function isOverdue(task) {
+      return Boolean(task.due_date) && task.due_date < todayISO() && task.status !== "Done";
+    }
+
     // ---- Layer 1: data ---------------------------------------------
     // Build the query string from the current filter controls so the backend
     // does the search + combined filtering.
@@ -449,9 +455,8 @@
         card.append(a);
       }
 
-      // Due date + overdue pill. Overdue is computed with the same rule as the
-      // backend: a due date before today on a task that is not Done.
-      const overdue = task.due_date && task.due_date < todayISO() && task.status !== "Done";
+      // Due date + overdue pill (overdue rule lives in isOverdue()).
+      const overdue = isOverdue(task);
       if (task.due_date || overdue) {
         const meta = document.createElement("div");
         meta.className = "meta";

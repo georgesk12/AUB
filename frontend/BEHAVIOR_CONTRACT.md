@@ -62,3 +62,4 @@ Backend running on `http://localhost:8000`, frontend served over HTTP (not
 | Date | What was refactored | Contract passed before | Contract passed after |
 |------|---------------------|------------------------|-----------------------|
 | 2026-07 | CSS visual refresh (gradient, card/button polish); no HTML/JS logic changes | yes | yes |
+| 2026-07 | Extract the frontend overdue rule into a named `isOverdue()` helper; behavior unchanged | yes | yes |
