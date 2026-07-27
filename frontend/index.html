@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task Board</title>
+  <style>
+    /* ---- Base ------------------------------------------------------ */
+    :root {
+      --accent: #ffab31;
+      --ink: #1a1a1a;
+      --muted: #565350;
+      --line: #e6e1dc;
+      --col-bg: #f5f2ef;
+      --card-bg: #ffffff;
+      --high: #e0574a;
+      --medium: #d9902a;
+      --low: #5a9e6f;
+    }
+    * { box-sizing: border-box; }
+    /* The hidden attribute must win over the display rules below. */
+    [hidden] { display: none !important; }
+    body {
+      margin: 0;
+      font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink);
+      background: #fbfaf8;
+    }
+    header {
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--line);
+      border-top: 4px solid var(--accent);
+    }
+    header h1 { margin: 0; font-size: 22px; }
+    header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+
+    /* ---- Banners (loading / error) --------------------------------- */
+    .banner {
+      margin: 16px 28px;
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #f0ede9;
+      color: var(--muted);
+    }
+    .banner.error {
+      background: #fdecea;
+      color: #a3271b;
+      border: 1px solid #f3c6c0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .banner.error button {
+      margin-left: auto;
+      border: 1px solid #a3271b;
+      background: #fff;
+      color: #a3271b;
+      border-radius: 6px;
+      padding: 5px 12px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    /* ---- Board ----------------------------------------------------- */
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      padding: 20px 28px 40px;
+      align-items: start;
+    }
+    @media (max-width: 720px) {
+      .board { grid-template-columns: 1fr; }
+    }
+    .column {
+      background: var(--col-bg);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+      min-height: 120px;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .column.drag-over {
+      background: #efe7d8;
+      box-shadow: inset 0 0 0 2px var(--accent);
+    }
+    .col-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      padding: 0 4px;
+    }
+    .col-title { font-weight: 700; font-size: 14px; }
+    .count {
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      min-width: 22px;
+      text-align: center;
+      border-radius: 20px;
+      padding: 1px 8px;
+    }
+    .cards { display: flex; flex-direction: column; gap: 10px; min-height: 24px; }
+    .empty {
+      margin: 6px 4px;
+      color: #a49f99;
+      font-size: 13px;
+      font-style: italic;
+    }
+
+    /* ---- Card ------------------------------------------------------ */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      cursor: grab;
+    }
+    .card:active { cursor: grabbing; }
+    .card.dragging { opacity: 0.5; }
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card .title { font-weight: 600; font-size: 14px; }
+    .card .desc { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+    .card .assignee { margin: 8px 0 0; font-size: 12px; color: #8a857f; }
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      border-radius: 20px;
+      padding: 2px 9px;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .badge.high { background: var(--high); }
+    .badge.medium { background: var(--medium); }
+    .badge.low { background: var(--low); }
+
+    /* ---- Toast ----------------------------------------------------- */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2b2926;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      max-width: 90vw;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Task Board</h1>
+    <p>Drag a card to move it forward. Backend rules decide whether a move is allowed.</p>
+  </header>
+
+  <!-- UI states -->
+  <div id="loading" class="banner">Loading tasks&hellip;</div>
+  <div id="error" class="banner error" hidden>
+    <span>Could not reach the API. Is the backend running on <code>localhost:8000</code>?</span>
+    <button id="retry" type="button">Retry</button>
+  </div>
+
+  <!-- Board (three fixed columns matching the API statuses) -->
+  <main id="board" class="board" hidden>
+    <section class="column" data-status="ToDo">
+      <div class="col-head"><span class="col-title">To Do</span><span class="count">0</span></div>
+      <div class="cards"></div>
+    </section>
+    <section class="column" data-status="InProgress">
+      <div class="col-head"><span class="col-title">In Progress</span><span class="count">0</span></div>
+      <div class="cards"></div>
+    </section>
+    <section class="column" data-status="Done">
+      <div class="col-head"><span class="col-title">Done</span><span class="count">0</span></div>
+      <div class="cards"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script>
+    // ---- Constants (must match the backend enums exactly) -----------
+    const API_BASE = "http://localhost:8000";
+    const STATUSES = ["ToDo", "InProgress", "Done"];
+    const STATUS_LABELS = { ToDo: "To Do", InProgress: "In Progress", Done: "Done" };
+    const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
+
+    // In-memory copy of what the server returned; the board renders from this.
+    let tasks = [];
+
+    // ---- Layer 1: data ---------------------------------------------
+    async function fetchTasks() {
+      const res = await fetch(`${API_BASE}/tasks`);
+      if (!res.ok) throw new Error(`GET /tasks failed: ${res.status}`);
+      return res.json();
+    }
+
+    // ---- Layer 2: state machine (loading / ready / error) ----------
+    function showState(state) {
+      document.getElementById("loading").hidden = state !== "loading";
+      document.getElementById("error").hidden = state !== "error";
+      document.getElementById("board").hidden = state !== "ready";
+    }
+
+    async function load() {
+      showState("loading");
+      try {
+        tasks = await fetchTasks();
+        renderBoard();
+        showState("ready");
+      } catch (err) {
+        console.error(err);
+        showState("error");
+      }
+    }
+
+    // ---- Layer 3: rendering ----------------------------------------
+    function sortByPriorityThenId(a, b) {
+      const pa = PRIORITY_ORDER[a.priority] ?? 99;
+      const pb = PRIORITY_ORDER[b.priority] ?? 99;
+      if (pa !== pb) return pa - pb;             // High -> Medium -> Low
+      return String(a.id).localeCompare(String(b.id)); // predictable tie-break
+    }
+
+    function createCard(task) {
+      const card = document.createElement("article");
+      card.className = "card";
+      card.draggable = true;
+      card.dataset.id = task.id;
+
+      const top = document.createElement("div");
+      top.className = "card-top";
+      const title = document.createElement("span");
+      title.className = "title";
+      title.textContent = task.title;            // textContent = no HTML injection
+      const badge = document.createElement("span");
+      badge.className = "badge " + String(task.priority).toLowerCase();
+      badge.textContent = task.priority;
+      top.append(title, badge);
+      card.append(top);
+
+      if (task.description) {
+        const d = document.createElement("p");
+        d.className = "desc";
+        d.textContent = task.description;
+        card.append(d);
+      }
+      if (task.assignee) {
+        const a = document.createElement("p");
+        a.className = "assignee";
+        a.textContent = "Assignee: " + task.assignee;
+        card.append(a);
+      }
+      return card;
+    }
+
+    function renderBoard() {
+      for (const status of STATUSES) {
+        const column = document.querySelector(`.column[data-status="${status}"]`);
+        const list = column.querySelector(".cards");
+        const items = tasks.filter(t => t.status === status).sort(sortByPriorityThenId);
+
+        list.innerHTML = "";
+        if (items.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "empty";
+          empty.textContent = "No tasks";
+          list.append(empty);
+        } else {
+          for (const task of items) list.append(createCard(task));
+        }
+        column.querySelector(".count").textContent = items.length;
+      }
+    }
+
+    // ---- Layer 4: drag and drop ------------------------------------
+    // Move a task optimistically, then confirm with the API; revert on reject.
+    async function moveTask(id, newStatus) {
+      const task = tasks.find(t => String(t.id) === String(id));
+      if (!task) return;
+      if (task.status === newStatus) return;     // dropped in the same column: no PATCH
+
+      const previous = task.status;
+      task.status = newStatus;                   // optimistic update
+      renderBoard();
+
+      try {
+        const res = await fetch(`${API_BASE}/tasks/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (!res.ok) {
+          let detail = `HTTP ${res.status}`;
+          try { detail = (await res.json()).detail || detail; } catch (_) {}
+          throw new Error(detail);
+        }
+        Object.assign(task, await res.json());   // sync with the server's truth
+        renderBoard();
+      } catch (err) {
+        task.status = previous;                  // revert the optimistic move
+        renderBoard();
+        showToast(`Move rejected: ${STATUS_LABELS[previous]} → ${STATUS_LABELS[newStatus]} is not allowed`);
+      }
+    }
+
+    // Delegated dragstart/dragend on the board so handlers survive re-render.
+    const board = document.getElementById("board");
+    board.addEventListener("dragstart", (e) => {
+      const card = e.target.closest(".card");
+      if (!card) return;
+      e.dataTransfer.setData("text/plain", card.dataset.id);
+      e.dataTransfer.effectAllowed = "move";
+      card.classList.add("dragging");
+    });
+    board.addEventListener("dragend", (e) => {
+      const card = e.target.closest(".card");
+      if (card) card.classList.remove("dragging");
+    });
+
+    // Columns are static, so attach their drop handlers once.
+    document.querySelectorAll(".column").forEach((col) => {
+      col.addEventListener("dragover", (e) => {
+        e.preventDefault();                      // REQUIRED so the browser allows a drop
+        e.dataTransfer.dropEffect = "move";
+        col.classList.add("drag-over");
+      });
+      col.addEventListener("dragleave", () => col.classList.remove("drag-over"));
+      col.addEventListener("drop", (e) => {
+        e.preventDefault();
+        col.classList.remove("drag-over");
+        const id = e.dataTransfer.getData("text/plain");
+        const newStatus = col.dataset.status;    // target status from the column, not display text
+        moveTask(id, newStatus);
+      });
+    });
+
+    // ---- Toast ------------------------------------------------------
+    let toastTimer;
+    function showToast(message) {
+      const el = document.getElementById("toast");
+      el.textContent = message;
+      el.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
+    }
+
+    // ---- Init -------------------------------------------------------
+    document.getElementById("retry").addEventListener("click", load);
+    load();
+  </script>
+</body>
+</html>

@@ -9,6 +9,7 @@ route each (specs B1-B2.4). Business rules (status transitions) come in 2.3.
 """
 
 from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from app import storage
 from app.api import health
@@ -21,6 +22,16 @@ app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
     description="Learning-project task tracker (Module 2).",
+)
+
+# CORS: the frontend (Module 3) is served from a different local origin
+# (e.g. Live Server on :5500), so the browser needs the backend to allow it.
+# Scoped to localhost / 127.0.0.1 on any port - local development only.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Register routers. The health check lives in its own module.
