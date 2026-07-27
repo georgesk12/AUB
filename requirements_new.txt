@@ -1,0 +1,13 @@
+# Task Tracker API - dependencies (Architecture A)
+# Lower-bound pins so pip picks current versions that ship prebuilt
+# wheels (including Python 3.14) - no compiling from source.
+
+fastapi>=0.115            # web framework
+uvicorn[standard]>=0.32   # ASGI server (uvloop/httptools/watchfiles all have 3.14 wheels)
+pydantic>=2.11            # request/response validation (pulls pydantic-core with a 3.14 wheel)
+pydantic-settings>=2.6    # typed settings loaded from the environment
+python-dotenv>=1.0        # loads variables from a .env file
+
+# --- dev / testing ---
+pytest>=8.3               # test runner
+httpx>=0.28               # test client used by FastAPI's TestClient
