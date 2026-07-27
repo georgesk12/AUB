@@ -159,12 +159,73 @@
       box-shadow: 0 4px 16px rgba(0,0,0,0.25);
       max-width: 90vw;
     }
+
+    /* ---- Header layout + buttons ----------------------------------- */
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .btn-primary {
+      background: var(--accent); color: #3a2f14; border: none;
+      font-weight: 700; font-size: 14px; border-radius: 8px;
+      padding: 9px 16px; cursor: pointer; white-space: nowrap;
+    }
+    .btn-primary:hover { filter: brightness(0.96); }
+    .btn-secondary {
+      background: #fff; color: var(--muted); border: 1px solid var(--line);
+      font-size: 14px; border-radius: 8px; padding: 9px 16px; cursor: pointer;
+    }
+    .edit-btn {
+      background: none; border: none; color: #a49f99; font-size: 12px;
+      cursor: pointer; padding: 2px 4px; text-decoration: underline; flex: none;
+    }
+    .edit-btn:hover { color: var(--muted); }
+
+    /* ---- Modal ----------------------------------------------------- */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding: 60px 16px; z-index: 50;
+    }
+    .modal {
+      background: #fff; border-radius: 12px; width: 100%; max-width: 460px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25); overflow: hidden;
+    }
+    .modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--line);
+    }
+    .modal-head h2 { margin: 0; font-size: 17px; }
+    .icon-btn {
+      background: none; border: none; font-size: 22px; line-height: 1;
+      color: var(--muted); cursor: pointer;
+    }
+    #task-form { padding: 18px 20px; }
+    #task-form label {
+      display: block; font-size: 13px; font-weight: 600;
+      margin-bottom: 12px; color: var(--muted);
+    }
+    #task-form input, #task-form textarea, #task-form select {
+      width: 100%; margin-top: 5px; padding: 8px 10px; font: inherit;
+      border: 1px solid var(--line); border-radius: 6px; color: var(--ink);
+      background: #fff;
+    }
+    #task-form .row { display: flex; gap: 12px; }
+    #task-form .row label { flex: 1; }
+    .req { color: var(--high); }
+    .field-error { color: #a3271b; font-size: 12.5px; margin: -6px 0 12px; }
+    .form-error {
+      color: #a3271b; font-size: 12.5px; margin: 4px 0 0;
+      padding: 8px 10px; background: #fdecea; border-radius: 6px;
+      border: 1px solid #f3c6c0;
+    }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Task Board</h1>
-    <p>Drag a card to move it forward. Backend rules decide whether a move is allowed.</p>
+    <div>
+      <h1>Task Board</h1>
+      <p>Drag a card to move it forward. Backend rules decide whether a move is allowed.</p>
+    </div>
+    <button id="new-task" class="btn-primary" type="button">+ New Task</button>
   </header>
 
   <!-- UI states -->
@@ -189,6 +250,49 @@
       <div class="cards"></div>
     </section>
   </main>
+
+  <!-- Create / Edit modal -->
+  <div id="overlay" class="overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <h2 id="modal-title">New Task</h2>
+        <button id="modal-close" class="icon-btn" type="button" aria-label="Close">&times;</button>
+      </div>
+      <form id="task-form" novalidate>
+        <label>Title <span class="req">*</span>
+          <input id="f-title" type="text" maxlength="200" autocomplete="off" />
+        </label>
+        <p id="title-error" class="field-error" hidden></p>
+        <label>Description
+          <textarea id="f-desc" rows="3"></textarea>
+        </label>
+        <div class="row">
+          <label>Status
+            <select id="f-status">
+              <option value="ToDo">To Do</option>
+              <option value="InProgress">In Progress</option>
+              <option value="Done">Done</option>
+            </select>
+          </label>
+          <label>Priority
+            <select id="f-priority">
+              <option value="High">High</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </label>
+        </div>
+        <label>Assignee
+          <input id="f-assignee" type="text" autocomplete="off" />
+        </label>
+        <p id="form-error" class="form-error" hidden></p>
+        <div class="modal-actions">
+          <button type="button" id="modal-cancel" class="btn-secondary">Cancel</button>
+          <button type="submit" id="modal-save" class="btn-primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <div id="toast" class="toast" hidden></div>
 
@@ -250,7 +354,13 @@
       const badge = document.createElement("span");
       badge.className = "badge " + String(task.priority).toLowerCase();
       badge.textContent = task.priority;
-      top.append(title, badge);
+      const edit = document.createElement("button");
+      edit.className = "edit-btn";
+      edit.type = "button";
+      edit.textContent = "Edit";
+      // Open the edit modal; stop the click from starting a drag.
+      edit.addEventListener("click", (e) => { e.stopPropagation(); openEdit(task); });
+      top.append(title, badge, edit);
       card.append(top);
 
       if (task.description) {
@@ -358,6 +468,134 @@
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
     }
+
+    // ---- Layer 5: create / edit modal ------------------------------
+    const overlay = document.getElementById("overlay");
+    const form = document.getElementById("task-form");
+    let editingId = null;   // null = create mode, otherwise the task id
+
+    function clearErrors() {
+      const te = document.getElementById("title-error");
+      te.hidden = true; te.textContent = "";
+      const fe = document.getElementById("form-error");
+      fe.hidden = true; fe.textContent = "";
+    }
+
+    function openCreate() {
+      editingId = null;
+      form.reset();
+      document.getElementById("modal-title").textContent = "New Task";
+      document.getElementById("modal-save").textContent = "Create";
+      document.getElementById("f-status").value = "ToDo";
+      document.getElementById("f-priority").value = "Medium";
+      clearErrors();
+      overlay.hidden = false;
+      document.getElementById("f-title").focus();
+    }
+
+    function openEdit(task) {
+      editingId = task.id;
+      document.getElementById("modal-title").textContent = "Edit Task";
+      document.getElementById("modal-save").textContent = "Save changes";
+      document.getElementById("f-title").value = task.title;
+      document.getElementById("f-desc").value = task.description || "";
+      document.getElementById("f-status").value = task.status;
+      document.getElementById("f-priority").value = task.priority;
+      document.getElementById("f-assignee").value = task.assignee || "";
+      clearErrors();
+      overlay.hidden = false;
+      document.getElementById("f-title").focus();
+    }
+
+    function closeModal() {
+      overlay.hidden = true;
+      editingId = null;
+    }
+
+    function showFormError(message) {
+      const fe = document.getElementById("form-error");
+      fe.textContent = message;
+      fe.hidden = false;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearErrors();
+
+      // Front-end validation: block an empty/whitespace title BEFORE any
+      // network request, so obvious mistakes never reach the backend.
+      const title = document.getElementById("f-title").value.trim();
+      if (!title) {
+        const te = document.getElementById("title-error");
+        te.textContent = "Title is required.";
+        te.hidden = false;
+        document.getElementById("f-title").focus();
+        return;
+      }
+
+      const descVal = document.getElementById("f-desc").value.trim();
+      const statusVal = document.getElementById("f-status").value;
+      const priorityVal = document.getElementById("f-priority").value;
+      const assigneeVal = document.getElementById("f-assignee").value.trim();
+
+      let url, method, payload;
+      if (editingId === null) {
+        method = "POST";
+        url = `${API_BASE}/tasks`;
+        payload = { title, status: statusVal, priority: priorityVal };
+        if (descVal) payload.description = descVal;
+        if (assigneeVal) payload.assignee = assigneeVal;
+      } else {
+        // Edit: send only the fields that actually changed. In particular,
+        // do NOT resend an unchanged status (the backend would reject
+        // current -> current as an invalid same->same transition).
+        const task = tasks.find(t => String(t.id) === String(editingId));
+        method = "PATCH";
+        url = `${API_BASE}/tasks/${editingId}`;
+        payload = {};
+        if (title !== task.title) payload.title = title;
+        if (descVal !== (task.description || "")) payload.description = descVal;
+        if (statusVal !== task.status) payload.status = statusVal;
+        if (priorityVal !== task.priority) payload.priority = priorityVal;
+        if (assigneeVal !== (task.assignee || "")) payload.assignee = assigneeVal || null;
+        if (Object.keys(payload).length === 0) { closeModal(); return; }
+      }
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          // Keep the modal open and show the server's message (e.g. a 422
+          // invalid-transition error) instead of silently closing.
+          let message = `Request failed (HTTP ${res.status}).`;
+          try {
+            const body = await res.json();
+            if (typeof body.detail === "string") message = body.detail;
+            else if (Array.isArray(body.detail) && body.detail[0]) {
+              message = body.detail[0].msg || message;
+            }
+          } catch (_) {}
+          showFormError(message);
+          return;
+        }
+        closeModal();
+        await load();   // refresh + resort the board on success
+      } catch (err) {
+        showFormError("Network error: " + err.message);
+      }
+    });
+
+    // Open create, and all the dismissal flows.
+    document.getElementById("new-task").addEventListener("click", openCreate);
+    document.getElementById("modal-cancel").addEventListener("click", closeModal);
+    document.getElementById("modal-close").addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !overlay.hidden) closeModal();
+    });
 
     // ---- Init -------------------------------------------------------
     document.getElementById("retry").addEventListener("click", load);
