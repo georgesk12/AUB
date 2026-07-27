@@ -7,7 +7,7 @@ database and no ORM - swapped for real persistence in a later module.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from app.models import TaskCreate, TaskPriority, TaskResponse, TaskStatus, TaskUpdate
@@ -22,6 +22,19 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def is_overdue(task: TaskResponse, today: Optional[date] = None) -> bool:
+    """A task is overdue if it has a due date before today and is not Done.
+
+    Overdue is computed here (not stored) so it always reflects the current
+    date and the task's latest status.
+    """
+    if task.due_date is None:
+        return False
+    if today is None:
+        today = date.today()
+    return task.due_date < today and task.status != TaskStatus.DONE
+
+
 def add_task(payload: TaskCreate) -> TaskResponse:
     """Create and store a task, assigning a new id and timestamps."""
     now = _now()
@@ -32,6 +45,7 @@ def add_task(payload: TaskCreate) -> TaskResponse:
         status=payload.status,
         priority=payload.priority,
         assignee=payload.assignee,
+        due_date=payload.due_date,
         created_at=now,
         updated_at=now,
     )
@@ -42,13 +56,33 @@ def add_task(payload: TaskCreate) -> TaskResponse:
 def get_all_tasks(
     status: Optional[TaskStatus] = None,
     priority: Optional[TaskPriority] = None,
+    assignee: Optional[str] = None,
+    search: Optional[str] = None,
+    overdue: Optional[bool] = None,
 ) -> list[TaskResponse]:
-    """Return all tasks, optionally filtered by status and/or priority."""
+    """Return tasks, optionally filtered. All filters combine with AND.
+
+    - status / priority: exact enum match
+    - assignee: case-insensitive exact match
+    - search: case-insensitive substring of title OR description
+    - overdue: True = only overdue, False = only not-overdue
+    """
     tasks = list(_tasks.values())
     if status is not None:
         tasks = [t for t in tasks if t.status == status]
     if priority is not None:
         tasks = [t for t in tasks if t.priority == priority]
+    if assignee is not None:
+        tasks = [t for t in tasks if (t.assignee or "").lower() == assignee.lower()]
+    if search:
+        q = search.lower()
+        tasks = [
+            t for t in tasks
+            if q in t.title.lower() or q in (t.description or "").lower()
+        ]
+    if overdue is not None:
+        today = date.today()
+        tasks = [t for t in tasks if is_overdue(t, today) == overdue]
     return tasks
 
 

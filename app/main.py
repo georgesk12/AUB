@@ -72,9 +72,20 @@ def create_task(payload: TaskCreate) -> TaskResponse:
 def list_tasks(
     status: TaskStatus | None = None,
     priority: TaskPriority | None = None,
+    assignee: str | None = None,
+    search: str | None = None,
+    overdue: bool | None = None,
 ) -> list[TaskResponse]:
-    # An empty result is a valid 200 with [], not a 404.
-    return storage.get_all_tasks(status=status, priority=priority)
+    # All filters combine with AND. An empty result is a valid 200 with [],
+    # not a 404. Invalid enum values for status/priority are rejected (422)
+    # by FastAPI before reaching here.
+    return storage.get_all_tasks(
+        status=status,
+        priority=priority,
+        assignee=assignee,
+        search=search,
+        overdue=overdue,
+    )
 
 
 @app.get("/tasks/{task_id}", response_model=TaskResponse, tags=["tasks"])

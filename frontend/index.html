@@ -223,6 +223,33 @@
       border: 1px solid #f3c6c0;
     }
     .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+
+    /* ---- Filter / search bar (mid-course) -------------------------- */
+    .filters {
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+      padding: 14px 28px 0;
+    }
+    .filters input[type="search"] {
+      flex: 1; min-width: 200px; padding: 8px 12px; font: inherit;
+      border: 1px solid var(--line); border-radius: 8px; color: var(--ink);
+    }
+    .filters select {
+      padding: 8px 10px; font: inherit; background: #fff;
+      border: 1px solid var(--line); border-radius: 8px; color: var(--ink);
+    }
+    .filters .check {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: var(--muted); white-space: nowrap;
+    }
+
+    /* ---- Card due date + overdue pill (mid-course) ----------------- */
+    .card .meta { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+    .card .due { font-size: 12px; color: var(--muted); }
+    .pill-overdue {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+      background: #fdecea; color: #a3271b; border: 1px solid #f3c6c0;
+      border-radius: 20px; padding: 1px 8px;
+    }
   </style>
 </head>
 <body>
@@ -233,6 +260,19 @@
     </div>
     <button id="new-task" class="btn-primary" type="button">+ New Task</button>
   </header>
+
+  <!-- Search + combined filters (mid-course) -->
+  <div class="filters">
+    <input id="q" type="search" placeholder="Search title or description…" autocomplete="off" />
+    <select id="filter-priority" aria-label="Filter by priority">
+      <option value="">All priorities</option>
+      <option value="High">High</option>
+      <option value="Medium">Medium</option>
+      <option value="Low">Low</option>
+    </select>
+    <label class="check"><input id="filter-overdue" type="checkbox" /> Overdue only</label>
+    <button id="clear-filters" class="btn-secondary" type="button">Clear</button>
+  </div>
 
   <!-- UI states -->
   <div id="loading" class="banner">Loading tasks&hellip;</div>
@@ -288,9 +328,14 @@
             </select>
           </label>
         </div>
-        <label>Assignee
-          <input id="f-assignee" type="text" autocomplete="off" />
-        </label>
+        <div class="row">
+          <label>Assignee
+            <input id="f-assignee" type="text" autocomplete="off" />
+          </label>
+          <label>Due date
+            <input id="f-due" type="date" />
+          </label>
+        </div>
         <p id="form-error" class="form-error" hidden></p>
         <div class="modal-actions">
           <button type="button" id="modal-cancel" class="btn-secondary">Cancel</button>
@@ -312,9 +357,31 @@
     // In-memory copy of what the server returned; the board renders from this.
     let tasks = [];
 
+    // Today as a YYYY-MM-DD string (for the client-side overdue pill).
+    function todayISO() {
+      const d = new Date();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${d.getFullYear()}-${m}-${day}`;
+    }
+
     // ---- Layer 1: data ---------------------------------------------
+    // Build the query string from the current filter controls so the backend
+    // does the search + combined filtering.
+    function currentQuery() {
+      const params = new URLSearchParams();
+      const q = document.getElementById("q").value.trim();
+      const priority = document.getElementById("filter-priority").value;
+      const overdue = document.getElementById("filter-overdue").checked;
+      if (q) params.set("search", q);
+      if (priority) params.set("priority", priority);
+      if (overdue) params.set("overdue", "true");
+      return params.toString();
+    }
+
     async function fetchTasks() {
-      const res = await fetch(`${API_BASE}/tasks`);
+      const qs = currentQuery();
+      const res = await fetch(`${API_BASE}/tasks${qs ? "?" + qs : ""}`);
       if (!res.ok) throw new Error(`GET /tasks failed: ${res.status}`);
       return res.json();
     }
@@ -380,6 +447,27 @@
         a.className = "assignee";
         a.textContent = "Assignee: " + task.assignee;
         card.append(a);
+      }
+
+      // Due date + overdue pill. Overdue is computed with the same rule as the
+      // backend: a due date before today on a task that is not Done.
+      const overdue = task.due_date && task.due_date < todayISO() && task.status !== "Done";
+      if (task.due_date || overdue) {
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        if (task.due_date) {
+          const due = document.createElement("span");
+          due.className = "due";
+          due.textContent = "Due " + task.due_date;
+          meta.append(due);
+        }
+        if (overdue) {
+          const pill = document.createElement("span");
+          pill.className = "pill-overdue";
+          pill.textContent = "Overdue";
+          meta.append(pill);
+        }
+        card.append(meta);
       }
       return card;
     }
@@ -508,6 +596,7 @@
       document.getElementById("f-status").value = task.status;
       document.getElementById("f-priority").value = task.priority;
       document.getElementById("f-assignee").value = task.assignee || "";
+      document.getElementById("f-due").value = task.due_date || "";
       clearErrors();
       overlay.hidden = false;
       document.getElementById("f-title").focus();
@@ -543,6 +632,7 @@
       const statusVal = document.getElementById("f-status").value;
       const priorityVal = document.getElementById("f-priority").value;
       const assigneeVal = document.getElementById("f-assignee").value.trim();
+      const dueVal = document.getElementById("f-due").value;   // "" or YYYY-MM-DD
 
       let url, method, payload;
       if (editingId === null) {
@@ -551,6 +641,7 @@
         payload = { title, status: statusVal, priority: priorityVal };
         if (descVal) payload.description = descVal;
         if (assigneeVal) payload.assignee = assigneeVal;
+        if (dueVal) payload.due_date = dueVal;
       } else {
         // Edit: send only the fields that actually changed. In particular,
         // do NOT resend an unchanged status (the backend would reject
@@ -564,6 +655,7 @@
         if (statusVal !== task.status) payload.status = statusVal;
         if (priorityVal !== task.priority) payload.priority = priorityVal;
         if (assigneeVal !== (task.assignee || "")) payload.assignee = assigneeVal || null;
+        if (dueVal !== (task.due_date || "")) payload.due_date = dueVal || null;
         if (Object.keys(payload).length === 0) { closeModal(); return; }
       }
 
@@ -601,6 +693,22 @@
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && !overlay.hidden) closeModal();
+    });
+
+    // ---- Filter / search controls (mid-course) ---------------------
+    // Each control re-fetches from the backend so search + filters combine.
+    let searchTimer;
+    document.getElementById("q").addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(load, 250);   // debounce typing
+    });
+    document.getElementById("filter-priority").addEventListener("change", load);
+    document.getElementById("filter-overdue").addEventListener("change", load);
+    document.getElementById("clear-filters").addEventListener("click", () => {
+      document.getElementById("q").value = "";
+      document.getElementById("filter-priority").value = "";
+      document.getElementById("filter-overdue").checked = false;
+      load();
     });
 
     // ---- Init -------------------------------------------------------

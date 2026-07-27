@@ -186,3 +186,78 @@ def test_patch_priority_only_keeps_status_and_returns_200(client, created_task):
     body = r.json()
     assert body["priority"] == "High"
     assert body["status"] == "ToDo"   # status left untouched
+
+
+# ==========================================================================
+# Mid-course project - Feature 1: due dates + overdue filter
+# ==========================================================================
+
+
+def test_create_task_with_valid_due_date_returns_201(client):
+    r = client.post("/tasks", json={"title": "Ship", "due_date": "2026-12-31"})
+    assert r.status_code == 201
+    assert r.json()["due_date"] == "2026-12-31"
+
+
+def test_create_task_invalid_due_date_format_returns_422(client):
+    r = client.post("/tasks", json={"title": "Ship", "due_date": "not-a-date"})
+    assert r.status_code == 422
+
+
+def test_update_task_due_date_returns_200(client, created_task):
+    r = client.patch(f"/tasks/{created_task['id']}", json={"due_date": "2027-01-15"})
+    assert r.status_code == 200
+    assert r.json()["due_date"] == "2027-01-15"
+
+
+def test_overdue_filter_returns_only_overdue_tasks(client):
+    from datetime import date, timedelta
+    yesterday = str(date.today() - timedelta(days=1))
+    tomorrow = str(date.today() + timedelta(days=1))
+    client.post("/tasks", json={"title": "past todo", "due_date": yesterday})            # overdue
+    client.post("/tasks", json={"title": "future todo", "due_date": tomorrow})           # not overdue
+    client.post("/tasks", json={"title": "past done", "due_date": yesterday, "status": "Done"})  # not (Done)
+    client.post("/tasks", json={"title": "no due date"})                                 # not overdue
+    r = client.get("/tasks", params={"overdue": "true"})
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 1
+    assert data[0]["title"] == "past todo"
+
+
+# ==========================================================================
+# Mid-course project - Feature 2: search + combined filters
+# ==========================================================================
+
+
+def test_search_matches_title_and_description(client):
+    client.post("/tasks", json={"title": "Deploy release", "description": "ship it"})
+    client.post("/tasks", json={"title": "Write docs", "description": "about the deploy pipeline"})
+    client.post("/tasks", json={"title": "Unrelated", "description": "nothing here"})
+    r = client.get("/tasks", params={"search": "deploy"})
+    assert r.status_code == 200
+    titles = {t["title"] for t in r.json()}
+    assert titles == {"Deploy release", "Write docs"}   # matched in title AND in description
+
+
+def test_combined_status_and_priority_filter(client):
+    client.post("/tasks", json={"title": "a", "priority": "High"})            # ToDo / High
+    b = client.post("/tasks", json={"title": "b", "priority": "High"}).json()
+    client.patch(f"/tasks/{b['id']}", json={"status": "InProgress"})          # InProgress / High
+    client.post("/tasks", json={"title": "c", "priority": "Low"})             # ToDo / Low
+    r = client.get("/tasks", params={"status": "InProgress", "priority": "High"})
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 1
+    assert data[0]["title"] == "b"
+
+
+def test_search_no_match_returns_200_and_empty_list(client, created_task):
+    r = client.get("/tasks", params={"search": "zzz-definitely-no-match"})
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_invalid_filter_value_returns_422(client):
+    r = client.get("/tasks", params={"status": "Bogus"})
+    assert r.status_code == 422
