@@ -89,12 +89,21 @@ python -m pytest          # full suite (30 tests)
 python verify_a.py        # standalone data-model check (8 assertions)
 ```
 
+## Design note
+
+The reasoning behind the main decisions - storage model, status rules, CI and
+Docker design, and the tradeoffs and open questions behind them - is written up
+in [`docs/technical-note.md`](docs/technical-note.md). Read it to understand
+*why* the project is built the way it is, not just *what* it does.
+
 ## Mid-course documentation
 
 `docs/midcourse/` contains the sprint deliverables: `user-stories.md`,
 `mini-adr.md`, `prompt-log.md`, `verification.md`, and `reflection.md`. The
-frontend behavior contract is at `frontend/BEHAVIOR_CONTRACT.md`, and the
-Module 3 debugging log is at `DEBUGGING_LOG.md`.
+frontend behavior contract is at `frontend/BEHAVIOR_CONTRACT.md`, the Module 3
+debugging log is at `DEBUGGING_LOG.md`, the documentation-verification log is at
+`docs/documentation-verification.md`, and the Module 4.5 AI code-review triage is
+at `docs/code-review-4.5.md`.
 
 ## Project structure
 
