@@ -1,8 +1,14 @@
-"""In-memory storage layer for the Task Tracker (Module 2, Part 2.1).
+"""In-memory storage layer for the Task Tracker.
 
-Built to the Module 2 Prompt Library "A1" spec. A module-level dict keyed by
-string id. IDs and timestamps are generated HERE, not in the routes. No
-database and no ORM - swapped for real persistence in a later module.
+A single module-level dict (``_tasks``) keyed by string id is the whole store;
+there is no database and no ORM. IDs (UUID strings) and the ``created_at`` /
+``updated_at`` timestamps are generated HERE, not in the routes, so the client
+can never set them. The store is process-local and cleared on restart, which is
+intentional for this learning project.
+
+Public functions: :func:`add_task`, :func:`get_all_tasks` (with AND-combined
+filters), :func:`get_task_by_id`, :func:`update_task`, :func:`delete_task`, and
+the pure helper :func:`is_overdue`. :func:`_reset` clears the store for tests.
 """
 from __future__ import annotations
 
@@ -23,10 +29,20 @@ def _now() -> datetime:
 
 
 def is_overdue(task: TaskResponse, today: Optional[date] = None) -> bool:
-    """A task is overdue if it has a due date before today and is not Done.
+    """Report whether a task is overdue.
 
-    Overdue is computed here (not stored) so it always reflects the current
-    date and the task's latest status.
+    A task is overdue when it has a ``due_date`` strictly before ``today`` and
+    its status is not ``Done``. This is computed on every call (never stored),
+    so it always reflects the current date and the task's latest status.
+
+    Args:
+        task: The task to check.
+        today: The reference date. Defaults to ``date.today()``; passed
+            explicitly by tests for determinism.
+
+    Returns:
+        bool: ``True`` if the task is overdue, otherwise ``False``. A task with
+            no ``due_date`` is never overdue.
     """
     if task.due_date is None:
         return False
@@ -36,7 +52,16 @@ def is_overdue(task: TaskResponse, today: Optional[date] = None) -> bool:
 
 
 def add_task(payload: TaskCreate) -> TaskResponse:
-    """Create and store a task, assigning a new id and timestamps."""
+    """Create and store a task, assigning a new id and timestamps.
+
+    Args:
+        payload: The validated new-task fields. ``description`` defaults to an
+            empty string when omitted.
+
+    Returns:
+        TaskResponse: The stored task, with a server-generated UUID ``id`` and
+            equal ``created_at`` / ``updated_at`` UTC timestamps.
+    """
     now = _now()
     task = TaskResponse(
         id=str(uuid.uuid4()),
@@ -62,10 +87,18 @@ def get_all_tasks(
 ) -> list[TaskResponse]:
     """Return tasks, optionally filtered. All filters combine with AND.
 
-    - status / priority: exact enum match
-    - assignee: case-insensitive exact match
-    - search: case-insensitive substring of title OR description
-    - overdue: True = only overdue, False = only not-overdue
+    Args:
+        status: Exact enum match on status.
+        priority: Exact enum match on priority.
+        assignee: Case-insensitive exact match on the assignee.
+        search: Case-insensitive substring of the title OR description. An
+            empty string is ignored (no filtering).
+        overdue: ``True`` keeps only overdue tasks, ``False`` keeps only
+            non-overdue; ``None`` applies no overdue filter.
+
+    Returns:
+        list[TaskResponse]: The matching tasks, in insertion order. An empty
+            list when nothing matches (never ``None``).
     """
     tasks = list(_tasks.values())
     if status is not None:
@@ -92,7 +125,21 @@ def get_task_by_id(task_id: str) -> Optional[TaskResponse]:
 
 
 def update_task(task_id: str, payload: TaskUpdate) -> Optional[TaskResponse]:
-    """Apply a partial update. Returns None if the task does not exist."""
+    """Apply a partial update to a stored task.
+
+    Only the fields the client actually sent (``exclude_unset``) are applied,
+    and ``updated_at`` is refreshed only when at least one field changes. This
+    function does NOT enforce status-transition rules - the route validates the
+    transition before calling here.
+
+    Args:
+        task_id: The id of the task to update.
+        payload: The fields to change (any subset of the editable fields).
+
+    Returns:
+        Optional[TaskResponse]: The updated task, or ``None`` if no task has
+            this id.
+    """
     existing = _tasks.get(task_id)
     if existing is None:
         return None

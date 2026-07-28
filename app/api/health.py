@@ -1,7 +1,8 @@
 """Health-check endpoint.
 
-This is the one working endpoint the skeleton ships with. If it returns 200
-with {"status": "ok"}, the foundation is sound and Module 2 can build on it.
+A tiny liveness probe registered as its own router. It returns 200 with
+``{"status": "ok", "timestamp": ...}`` whenever the service is up, and is used
+by the Docker ``HEALTHCHECK`` and by callers checking the API is reachable.
 """
 
 from datetime import datetime, timezone
@@ -15,7 +16,9 @@ router = APIRouter(tags=["health"])
 def health() -> dict:
     """Report that the service is up.
 
-    Returns a 200 response with a status flag and the current UTC timestamp.
+    Returns:
+        dict: HTTP 200 with ``status`` fixed to ``"ok"`` and ``timestamp`` set
+            to the current UTC time in ISO-8601 format.
     """
     return {
         "status": "ok",

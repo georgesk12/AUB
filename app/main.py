@@ -1,11 +1,9 @@
-"""Application entry point.
+"""Task Tracker API - application entry point.
 
-Creates the FastAPI app, wires in the routers, and (when run directly)
-starts the uvicorn server on the configured port. No authentication and no
-database - intentional for this learning skeleton.
-
-Module 2.2: the five CRUD endpoints for /tasks are defined here, one strict
-route each (specs B1-B2.4). Business rules (status transitions) come in 2.3.
+Creates the FastAPI app, applies CORS for the local frontend, and defines the
+task routes. Storage is in-memory (no database) and there is no authentication
+- this is a learning project. The full HTTP contract (routes, status codes and
+filters) is documented on each handler below and rendered at ``/docs``.
 """
 
 from fastapi import FastAPI, HTTPException, status
@@ -17,16 +15,19 @@ from app.business_rules import validate_status_transition
 from app.core.config import settings
 from app.models import TaskCreate, TaskPriority, TaskResponse, TaskStatus, TaskUpdate
 
-# The FastAPI instance. `title` and `version` show up in the /docs page.
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
-    description="Learning-project task tracker (Module 2).",
+    description=(
+        "A small task tracker REST API: create, list/filter, read, update "
+        "(with status-transition rules) and delete tasks. In-memory storage, "
+        "no authentication."
+    ),
 )
 
-# CORS: the frontend (Module 3) is served from a different local origin
-# (e.g. Live Server on :5500), so the browser needs the backend to allow it.
-# Scoped to localhost / 127.0.0.1 on any port - local development only.
+# CORS: the frontend is served from a different local origin (e.g. Live Server
+# on :5500), so the browser needs the backend to allow it. Scoped to
+# localhost / 127.0.0.1 on any port - local development only.
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
@@ -40,7 +41,11 @@ app.include_router(health.router)
 
 @app.get("/", tags=["root"])
 def root() -> dict:
-    """Friendly landing payload pointing users at the docs."""
+    """Landing payload pointing callers at the docs and health check.
+
+    Returns:
+        dict: The app name, environment, and the ``/docs`` and ``/health`` paths.
+    """
     return {
         "name": settings.app_name,
         "environment": settings.app_env,
@@ -50,9 +55,9 @@ def root() -> dict:
 
 
 # --------------------------------------------------------------------------
-# Task CRUD endpoints (Module 2.2). Each route delegates to the storage layer;
-# ids and timestamps are generated in storage, validation is handled by
-# Pydantic, and missing tasks raise 404.
+# Task CRUD endpoints. Each route delegates to the storage layer; ids and
+# timestamps are generated in storage, input validation is handled by
+# Pydantic, and a missing task raises 404.
 # --------------------------------------------------------------------------
 
 
@@ -63,8 +68,24 @@ def root() -> dict:
     tags=["tasks"],
 )
 def create_task(payload: TaskCreate) -> TaskResponse:
-    # Invalid input (missing/blank/overlong title, bad enum, unknown field)
-    # is rejected by Pydantic with 422 before we get here.
+    """Create a task.
+
+    Args:
+        payload: The new task. ``title`` is required; ``status`` and
+            ``priority`` default to ``ToDo`` and ``Medium``.
+
+    Returns:
+        TaskResponse: The created task, with a generated id and timestamps
+            (HTTP 201).
+
+    Raises:
+        HTTPException: 422 (via Pydantic) if the title is missing, blank or
+            over 200 characters, an enum value is invalid, or an unknown field
+            is sent.
+
+    Example:
+        ``POST /tasks {"title": "Ship release", "priority": "High"}`` -> 201.
+    """
     return storage.add_task(payload)
 
 
@@ -76,9 +97,27 @@ def list_tasks(
     search: str | None = None,
     overdue: bool | None = None,
 ) -> list[TaskResponse]:
-    # All filters combine with AND. An empty result is a valid 200 with [],
-    # not a 404. Invalid enum values for status/priority are rejected (422)
-    # by FastAPI before reaching here.
+    """List tasks, optionally filtered. All filters combine with AND.
+
+    Args:
+        status: Keep only tasks with this status.
+        priority: Keep only tasks with this priority.
+        assignee: Case-insensitive exact match on the assignee.
+        search: Case-insensitive substring of the title OR description.
+        overdue: ``true`` keeps only overdue tasks (due date before today and
+            not Done); ``false`` keeps only non-overdue.
+
+    Returns:
+        list[TaskResponse]: The matching tasks. An empty result is HTTP 200
+            with ``[]`` (never a 404).
+
+    Raises:
+        HTTPException: 422 (via FastAPI) if ``status`` or ``priority`` is not a
+            valid enum value.
+
+    Example:
+        ``GET /tasks?search=deploy&priority=High`` -> 200 with the matches.
+    """
     return storage.get_all_tasks(
         status=status,
         priority=priority,
@@ -90,6 +129,17 @@ def list_tasks(
 
 @app.get("/tasks/{task_id}", response_model=TaskResponse, tags=["tasks"])
 def get_task(task_id: str) -> TaskResponse:
+    """Retrieve a single task by id.
+
+    Args:
+        task_id: The task's id.
+
+    Returns:
+        TaskResponse: The task (HTTP 200).
+
+    Raises:
+        HTTPException: 404 if no task has this id.
+    """
     task = storage.get_task_by_id(task_id)
     if task is None:
         raise HTTPException(
@@ -101,8 +151,28 @@ def get_task(task_id: str) -> TaskResponse:
 
 @app.patch("/tasks/{task_id}", response_model=TaskResponse, tags=["tasks"])
 def update_task(task_id: str, payload: TaskUpdate) -> TaskResponse:
-    # Business rule (2.3): only validate a transition when a new status is
-    # supplied. Title-only / partial updates skip this entirely.
+    """Partially update a task, enforcing status-transition rules.
+
+    Only the fields present in the body are changed. When ``status`` is
+    supplied, the change is validated against the allowed transitions
+    (ToDo->InProgress, InProgress->Done, Done->InProgress); a title-only or
+    other partial update skips transition validation entirely.
+
+    Args:
+        task_id: The task's id.
+        payload: The fields to change (any subset of the editable fields).
+
+    Returns:
+        TaskResponse: The updated task (HTTP 200).
+
+    Raises:
+        HTTPException: 404 if the task does not exist; 422 for an invalid
+            status transition, or (via Pydantic) an invalid field value.
+
+    Example:
+        ``PATCH /tasks/{id} {"status": "InProgress"}`` on a ToDo task -> 200;
+        ``{"status": "Done"}`` on a ToDo task -> 422.
+    """
     if payload.status is not None:
         existing = storage.get_task_by_id(task_id)
         # Check existence BEFORE validating, so a missing task is a 404.
@@ -128,13 +198,23 @@ def update_task(task_id: str, payload: TaskUpdate) -> TaskResponse:
     tags=["tasks"],
 )
 def delete_task(task_id: str) -> None:
+    """Delete a task.
+
+    Args:
+        task_id: The task's id.
+
+    Returns:
+        None: HTTP 204 with an empty body on success (no JSON payload).
+
+    Raises:
+        HTTPException: 404 if no task has this id.
+    """
     deleted = storage.delete_task(task_id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Task with id {task_id} not found",
         )
-    # 204: no response body.
     return None
 
 

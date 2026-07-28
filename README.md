@@ -66,6 +66,22 @@ python3 -m http.server 5500 --directory frontend
 Then open <http://localhost:5500>. (VS Code Live Server on `frontend/index.html`
 works too.) CORS is already configured for local origins.
 
+## Run with Docker
+
+A multi-stage `Dockerfile` builds a slim image (`python:3.12-slim`) that runs
+the backend as a **non-root** user. Build and run it:
+
+```bash
+docker build -t task-tracker .
+docker run --rm -p 8000:8000 task-tracker
+```
+
+The API is then at <http://127.0.0.1:8000> (docs at `/docs`), same as the
+`uvicorn` command above but with no `--reload`. The image ships a
+`HEALTHCHECK` that polls `/health`, so `docker ps` shows the container as
+`healthy` once it is up. Only `app/` is copied into the image; tests, docs, the
+frontend and `.env` are excluded via `.dockerignore`.
+
 ## Run the tests
 
 ```bash

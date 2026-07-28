@@ -1,10 +1,9 @@
-"""Business rules for the Task Tracker (Module 2.3).
+"""Business rules for the Task Tracker: status-transition validation.
 
-Status-transition validation. A setter that writes any status is not a
-business rule - the rule is about which (current -> new) pairs are allowed.
-The rules live in a frozenset (not an if/elif chain) so they are one line
-to extend later, and same->same is rejected implicitly because it is not in
-the set.
+The rule is about which ``(current -> new)`` status pairs are allowed, so the
+allowed pairs live in a ``frozenset`` (``VALID_TRANSITIONS``) rather than an
+if/elif chain - it is one line to extend, and same->same is rejected implicitly
+because it is not in the set.
 
 Allowed:  ToDo -> InProgress, InProgress -> Done, Done -> InProgress (reopen)
 Rejected: ToDo -> Done (skips work), Done -> ToDo (revert), and same -> same
@@ -23,9 +22,19 @@ VALID_TRANSITIONS: frozenset[tuple[TaskStatus, TaskStatus]] = frozenset(
 
 
 def validate_status_transition(current: TaskStatus, new: TaskStatus) -> None:
-    """Raise 422 unless (current, new) is an allowed transition.
+    """Validate a status change, raising on a disallowed transition.
 
-    Same -> same is invalid. Anything not in VALID_TRANSITIONS is invalid.
+    Args:
+        current: The task's current status.
+        new: The requested new status.
+
+    Returns:
+        None: Returns nothing when the transition is allowed.
+
+    Raises:
+        HTTPException: 422 if ``(current, new)`` is not in
+            ``VALID_TRANSITIONS``. Same -> same is always invalid. The error
+            detail lists the allowed transitions.
     """
     if (current, new) not in VALID_TRANSITIONS:
         allowed = sorted({f"{f.value}->{t.value}" for f, t in VALID_TRANSITIONS})
