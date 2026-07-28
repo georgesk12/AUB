@@ -1,0 +1,31 @@
+# Defense in depth: keep the build context small and free of anything the
+# runtime image should never contain (secrets, VCS, tests, docs, tooling).
+
+# Version control
+.git
+.github
+.gitignore
+
+# Python caches / local envs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+
+# Not needed in the runtime image
+tests/
+docs/
+frontend/
+*.md
+CLAUDE.md
+verify_a.py
+
+# Docker files themselves
+Dockerfile
+.dockerignore
