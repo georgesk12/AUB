@@ -18,6 +18,6 @@ def health() -> dict:
     Returns a 200 response with a status flag and the current UTC timestamp.
     """
     return {
-        "status": "ok",
+        "status": "down",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
