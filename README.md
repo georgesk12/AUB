@@ -9,6 +9,62 @@ Stack: Python + FastAPI + Pydantic v2, in-memory storage (no database), no
 authentication. Frontend is a single self-contained HTML file. See
 `docs/midcourse/mini-adr.md` for the design decisions.
 
+## Final Project
+
+Branch reviewed: `final-project`
+
+### What this submission demonstrates
+
+- The existing Task Tracker still runs and stays inside the intended course
+  scope - no new product features were added.
+- CI runs the pytest suite on push and/or pull request.
+- The Docker image builds and runs, with `/health` returning 200 and the process
+  running as a non-root user.
+- AI review, security, and ownership evidence live in `docs/`.
+
+### How to run locally
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --reload --port 8000
+```
+
+Backend at <http://127.0.0.1:8000> (docs at `/docs`, health at `/health`). Serve
+the frontend in a second terminal with
+`python3 -m http.server 5500 --directory frontend`, then open
+<http://localhost:5500>.
+
+### How to run tests
+
+```bash
+python -m pytest
+```
+
+### How to run with Docker
+
+```bash
+docker build -t task-tracker .
+docker run --rm -p 8000:8000 task-tracker
+curl http://127.0.0.1:8000/health
+```
+
+### Evidence files
+
+- `docs/release-evidence.md` - baseline, CI, Docker, and claim-vs-reality checks.
+- `docs/final-ai-review.md` - AI code review, security review, and ownership.
+- `docs/ai-playbook.md` - personal AI playbook and decision card.
+
+### AI assistance summary
+
+AI helped draft or review: CI, Docker, docs, security, and debugging. I verified
+the work by: running the tests, reviewing every diff, checking Docker `/health`,
+and doing a manual security scan. One AI suggestion I rejected: the Docker
+`--workers 4` recommendation, which would have broken the per-process in-memory
+store.
+
 ## Features
 
 - Strict data model with Pydantic v2 validation (`extra="forbid"`, title

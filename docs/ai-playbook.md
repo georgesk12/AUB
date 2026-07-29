@@ -1,67 +1,73 @@
 # My Personal AI Coding Playbook
 
-One page. My own workflow, built from what actually happened across this course -
-not a vendor page and not advice that would fit any other student. Every rule
-below is here because a specific thing went right or wrong while I built this
-task tracker.
+One page, my own workflow, revised after the final project. Every rule is here
+because a specific thing went right or wrong while I built this task tracker -
+not because it sounds responsible.
 
-## Decision card - which tool I reach for first
+## When I reach for AI first
 
-| Task shape | I reach for | Why - from my own experience |
-|---|---|---|
-| **Build a feature / larger implementation loop** | **Claude (Cowork)** | I built the whole backend (M2), the Kanban frontend (M3) and the mid-course features here, and I turned Cursor down on purpose. A build-and-verify loop in one place is how I actually work. |
-| **Code review, security review, governance** | **Codex app** | I ran all of Module 5's grading work in Codex. Its review pane, diff-before-apply, and higher limits fit read-and-grade work better than a build loop does. |
-| **Debugging** | **Claude (Cowork) + the terminal as ground truth** | Module 3.5 and the "haunted Mac": the browser showed my pages as up while the server was dead. `curl`, `lsof` and Firefox were the truth. I debug against ground truth, in a tool that can run it. |
-| **Infrastructure - CI, Docker** | **Claude (Cowork), terminal delivery** | Module 4: CLAUDE.md, the red-and-green CI proof, and the non-root Docker image were all terminal-delivery work, and that is where that tool is strongest. |
-| **Planning / architecture** | **Codex app, repo-grounded** | Module 5.4 and 5.5 showed me a generic plan reads fine and is still wrong for my project. A plan is only worth grading when the agent read my actual files first. |
-| **Requirements and written docs** | **Claude (Cowork)** | Module 1 stories and ADR, the Word deliverables, and the technical note all came together fastest here, drafting structure then rewriting in my voice. |
+For a build-and-verify loop on a well-scoped task: I built the backend (M2), the
+Kanban frontend (M3), and the mid-course features here. For read-and-grade work -
+security review, code review, governance, and repo-grounded planning (M5). For
+drafting structure I will then rewrite in my own voice - stories, ADRs, the
+technical note. AI is fastest when I already know what "done" looks like and can
+check the result.
 
-The split I actually settled into: **build, deliver and write in Cowork; review,
-govern and plan in Codex.** Cursor and Copilot I evaluated and set aside - not
-because they cannot do the work, but because these two match how I want to work.
+## When I do not reach for AI first
 
-## When I do not reach for AI
-
-When the task is one deliberate line I already understand, when I am about to
-paste anything sensitive, or when I have not yet decided what "done" looks like.
-AI is fast and confidently wrong often enough that pointing it at an
-under-specified task just produces confident noise.
+When the task is one deliberate line I already understand. When I have not yet
+decided what "done" means - an under-specified prompt just produces confident
+noise. When I am about to paste anything sensitive. And when the point is for me
+to learn the thing myself, not to have it handed over.
 
 ## My non-negotiables
 
-1. **I verify against ground truth, never a convenient UI.**
-   The CI "Re-run all jobs" button replayed an old commit and stayed green until
-   I pushed a *new* commit and read *that* run. Chrome served cached pages from a
-   dead server. So I trust the commit, the `curl`, the `pytest` run and the raw
-   file - not the checkmark and not the confident answer.
+1. **I verify against ground truth, not a convenient UI.** The CI "Re-run all
+   jobs" button replayed an old commit and stayed green until I pushed a *new*
+   commit and read *that* run; Chrome served cached pages from a dead server. I
+   trust the commit, the `curl`, the `pytest` run, and the raw file.
+2. **I grade AI review; I never accept it because it sounds senior.** Four of
+   nine comments on an 84-line Docker diff were wrong, and "`--workers 4`" would
+   have silently broken my in-memory store.
+3. **I state my constraints before I ask.** In-memory storage, no auth, no
+   database, vanilla JS, exact status and transition rules - or AI "improves" the
+   assignment into a different product.
+4. **I distrust a test until it has failed on purpose.** A passing test is not
+   evidence until I have broken the behavior it guards and watched it go red.
 
-2. **I grade AI review output; I never accept it because it sounds senior.**
-   On an 84-line Docker diff, four of nine AI comments were wrong, and the
-   worst - "add `--workers 4`" - would have silently broken my per-process
-   in-memory store. Every finding gets a label: useful, noise, wrong, or
-   course-scope - before it gets acted on.
+## My review rules
 
-3. **I state my constraints before I ask for anything.**
-   In-memory storage, no auth, no database, vanilla-JS frontend, exact status and
-   transition rules. Without those named up front, AI "improves" the assignment
-   into a different product - workers, a DB, a framework I never asked for.
+I keep AI changes small and scoped so a diff is readable; a change that sprawls
+across many files gets paused and questioned. I read every diff before it is
+applied - Codex's diff-before-apply pane is the point, not a formality. I sort
+every review comment into useful, noise, wrong, valid, false positive, or
+course-scope, and each one needs a reason before I act. I run the command myself
+rather than trusting the summary of it. And I never weaken a test to make the
+suite pass.
 
-4. **I distrust a test until it has failed on purpose.**
-   A passing test is not evidence until I have broken the behavior it guards and
-   watched it go red, then restored it. That is how I proved the transition rules
-   and the CI pipeline actually protect something.
+## What I am still figuring out
 
-## The one rule I will never break
+Whether "review and plan in Codex, build and write in Cowork" holds once tasks
+get bigger, or whether one tool eventually wins for me. How a team would agree on
+these rules rather than each developer keeping a private playbook. Where the line
+really sits between a smooth long-running agent thread and one that has quietly
+changed too many files before I looked. And when the in-memory-vs-real-database
+line finally forces local and production onto the same footing.
 
-**I sign every line. I do not ship AI output I have not read and verified myself -
-not a green check, not a confident explanation, not a passing test I have not
-tried to break.** The tool is a fast junior collaborator who is wrong about a
-third of the time. Owning the result is my job, and it is the whole point of the
-course.
+## Decision card
+
+| Situation | Tool I reach for first | The reason |
+|---|---|---|
+| **New feature** | Claude (Cowork) | A build-and-verify loop in one place; it is how I built M2-M4. |
+| **Code review** | Codex app | Review pane, diff-before-apply, higher limits - grading beats building here. |
+| **Debugging** | Claude (Cowork) + terminal as truth | The "haunted Mac": the browser lied, `curl`/`lsof`/Firefox told the truth. |
+| **Infrastructure (CI/Docker)** | Claude (Cowork), terminal delivery | Where CLAUDE.md, the red-and-green CI, and the non-root image came from. |
+| **Never paste** | (no tool) | `.env`, secrets, tokens, production logs, real customer/personal data. |
+| **One rule I will never break** | (every tool) | I sign every line - I do not ship AI output I have not read and verified myself: not a green check, not a confident answer, not a passing test I have not tried to break. |
 
 ## 30-day check
 
 Reread this in a month and ask the uncomfortable question: am I still following
 these rules, or did the rules quietly change because a smooth interface made
 accepting output feel like progress? If a rule no longer fits how I work, rewrite
-it honestly - do not just keep it on the page for show.
+it honestly - do not keep it on the page for show.
