@@ -105,6 +105,17 @@ debugging log is at `DEBUGGING_LOG.md`, the documentation-verification log is at
 `docs/documentation-verification.md`, and the Module 4.5 AI code-review triage is
 at `docs/code-review-4.5.md`.
 
+## AI-assisted-coding artifacts (Module 5)
+
+The course closing set - review, governance and planning docs, no app code:
+my [**personal AI playbook**](docs/ai-playbook.md) (which tool I reach for when,
+and the rules I will not break), the [security review](docs/security-review.md),
+the [governance retrospective](docs/governance-worksheet.md) and
+[AI-usage rules](docs/ai-usage.md), the
+[comments feature plan](docs/decision/comments-feature-plan.md), and the
+[architecture note](docs/architecture.md) with its context-strategy comparison.
+Agent guidance for the repo lives in `AGENTS.md` and `CLAUDE.md`.
+
 ## Project structure
 
 ```
