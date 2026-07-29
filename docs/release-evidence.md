@@ -25,10 +25,13 @@ Factual release-check evidence for the final project. Captured on the
 ## CI evidence
 
 - **Workflow file:** `.github/workflows/ci.yml`.
-- **Latest run link or note:** the workflow runs `pytest` on every push (any
-  branch) and every pull request. It has run green on prior pushes to `main`
-  during Module 4, including a deliberate red-then-green break-test cycle proving
-  the pipeline can fail. Pushing `final-project` triggers a fresh run.
+- **Latest run link or note:** run **#14** on the `final-project` branch
+  (commit `607bcad`) finished **Success** in 24s total, with the `test` job
+  green in 21s. The workflow runs `pytest` on every push (any branch) and every
+  pull request. It has also run green on prior pushes to `main` during Module 4,
+  including a deliberate red-then-green break-test cycle proving the pipeline can
+  fail. (One non-fatal annotation on run #14 is a GitHub-platform Node.js runtime
+  deprecation for the setup actions - it does not affect the test result.)
 - **Test command used by CI:** `pytest` (plain, after
   `pip install -r requirements.txt` on a pinned Python `3.14`).
 - **Shortcut check:** no `continue-on-error`, no `|| true`, `pytest` is not
